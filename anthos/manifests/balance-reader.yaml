@@ -95,12 +95,9 @@ spec:
                 name: ledger-db-config
           image: us-central1-docker.pkg.dev/bank-of-anthos-ci/bank-of-anthos/balancereader:v0.6.8@sha256:7668390ec0a89f885e85604b741d861e47e115365224644d4c045868100c7265
           livenessProbe:
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - |
-                  wget -q -O- http://status-server:8080/status || exit 1
+            httpGet:
+              path: /healthy
+              port: 8080
             initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 10

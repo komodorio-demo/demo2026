@@ -58,7 +58,8 @@ spec:
     spec:
       containers:
         - name: status-server
-          image: python:3.11-alpine
+          # Changed from python:3.11-alpine to GCR mirror to avoid Docker Hub rate limits
+          image: gcr.io/google-containers/python:3.11-alpine
           ports:
             - containerPort: 8080
               name: http
