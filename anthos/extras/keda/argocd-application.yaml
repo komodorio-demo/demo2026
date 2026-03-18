@@ -1,6 +1,6 @@
 ---
-# ArgoCD Application for KEDA installation
-# This installs KEDA operator in the keda namespace
+# ArgoCD Application for KEDA installation only
+# The payment-processor ScaledObject should be applied directly via kubectl
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -28,26 +28,3 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
----
-# ArgoCD Application for payment-processor ScaledObject
-# This deploys the ScaledObject that auto-scales payment-processor
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: payment-processor-autoscaling
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/komodorio-demo/demo2026
-    targetRevision: HEAD
-    path: anthos/manifests
-    directory:
-      include: payment-processor-scaledobject.yaml
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: bank-of-singapore-demo10-1773848223
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
