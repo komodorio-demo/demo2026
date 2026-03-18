@@ -6,26 +6,22 @@ Choose one method based on your deployment strategy:
 
 ### Method 1: ArgoCD (Recommended if ArgoCD is installed)
 
-Apply the ArgoCD Applications:
+Install KEDA via ArgoCD:
 ```bash
 kubectl apply -f argocd-application.yaml
 ```
 
-This creates two ArgoCD Applications:
-1. **keda** - Installs KEDA operator from Helm chart
-2. **payment-processor-autoscaling** - Deploys the ScaledObject from this repo
+This creates an ArgoCD Application that installs KEDA operator from the official Helm chart.
 
-ArgoCD will automatically:
-- Install KEDA in the `keda` namespace
-- Deploy the payment-processor ScaledObject
-- Keep everything in sync with the Git repository
-- Self-heal if any resources are modified manually
-
-Verify ArgoCD Applications:
+Verify ArgoCD Application:
 ```bash
-kubectl get applications -n argocd
+kubectl get application keda -n argocd
 argocd app get keda
-argocd app get payment-processor-autoscaling
+```
+
+After KEDA is installed by ArgoCD, apply the ScaledObject directly:
+```bash
+kubectl apply -f ../../manifests/payment-processor-scaledobject.yaml
 ```
 
 ### Method 2: Direct kubectl apply
