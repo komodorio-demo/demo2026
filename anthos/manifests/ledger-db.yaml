@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# IMPORTANT: Manual kubectl edits bypass Git and cause config drift.
+# Always update this file and apply via GitOps to prevent typos like SPRING_DATASOURCE_URL_oops.
 apiVersion: v1
 data:
   POSTGRES_DB: postgresdb
