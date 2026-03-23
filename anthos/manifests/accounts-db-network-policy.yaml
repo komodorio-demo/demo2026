@@ -1,0 +1,30 @@
+# NetworkPolicy to allow userservice and balancereader to access accounts-db
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: accounts-db-policy
+  labels:
+    app: accounts-db
+    application: bank-of-anthos
+    environment: development
+    team: accounts
+spec:
+  podSelector:
+    matchLabels:
+      app: accounts-db
+      team: accounts
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: userservice
+              team: accounts
+        - podSelector:
+            matchLabels:
+              app: balancereader
+              team: accounts
+      ports:
+        - protocol: TCP
+          port: 5432
