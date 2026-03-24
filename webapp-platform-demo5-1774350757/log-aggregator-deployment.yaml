@@ -1,0 +1,46 @@
+# Log Aggregator Deployment
+# Fixes:
+# 1. RBAC permissions by using dedicated ServiceAccount
+# 2. Memory pressure by increasing limits from 32Mi to 64Mi
+# 3. Resource requests increased for stability
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-aggregator
+  namespace: webapp-platform-demo5-1774350757
+  labels:
+    app: log-aggregator
+    component: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: log-aggregator
+  template:
+    metadata:
+      labels:
+        app: log-aggregator
+        component: observability
+    spec:
+      serviceAccountName: log-aggregator-sa  # Changed from 'default'
+      containers:
+      - name: aggregator
+        image: busybox:1.36
+        command:
+        - /bin/sh
+        - /scripts/run.sh
+        resources:
+          limits:
+            memory: 64Mi  # Increased from 32Mi
+          requests:
+            cpu: 10m
+            memory: 32Mi  # Increased from 16Mi
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: scripts
+        secret:
+          secretName: log-aggregator-scripts
+          defaultMode: 0755

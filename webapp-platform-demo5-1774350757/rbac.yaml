@@ -1,0 +1,34 @@
+# RBAC configuration for log-aggregator
+# Fixes: ERROR RBAC: cannot list resource "events" in API group ""
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: log-aggregator-sa
+  namespace: webapp-platform-demo5-1774350757
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: log-aggregator-role
+  namespace: webapp-platform-demo5-1774350757
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["list", "get", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list", "get", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: log-aggregator-binding
+  namespace: webapp-platform-demo5-1774350757
+subjects:
+- kind: ServiceAccount
+  name: log-aggregator-sa
+  namespace: webapp-platform-demo5-1774350757
+roleRef:
+  kind: Role
+  name: log-aggregator-role
+  apiGroup: rbac.authorization.k8s.io
