@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-processor
+  namespace: bank-of-singapore-demo5-1774369357
+  labels:
+    app: payment-processor
+    component: settlement
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-processor
+  template:
+    metadata:
+      labels:
+        app: payment-processor
+        component: settlement
+    spec:
+      containers:
+      - name: processor
+        image: quay.io/strimzi/kafka:0.51.0-kafka-4.1.1
+        command:
+        - /bin/sh
+        - /scripts/entrypoint.sh
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: my-cluster-kafka-bootstrap:9092
+        - name: CONSUMER_GROUP_ID
+          value: payment-processor-group
+        - name: KAFKA_TOPIC
+          value: payment-events
+        - name: KAFKA_HEAP_OPTS
+          value: -Xmx256m -Xms128m
+        resources:
+          requests:
+            cpu: 100m
+            memory: 384Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - test -f /tmp/healthy
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - test -f /tmp/lag_ok
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: scripts
+        secret:
+          secretName: processor-scripts
+          defaultMode: 0755
