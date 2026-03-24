@@ -1,0 +1,40 @@
+# Dependency Checker Deployment
+# Fixes: WARN Detected OOMKilled container in pod dependency-checker
+# Increases memory limits to prevent OOMKills
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dependency-checker
+  namespace: webapp-platform-demo5-1774350757
+  labels:
+    app: dependency-checker
+    component: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dependency-checker
+  template:
+    metadata:
+      labels:
+        app: dependency-checker
+        component: observability
+    spec:
+      containers:
+      - name: checker
+        image: busybox:1.36
+        command:
+        - /bin/sh
+        - -c
+        - |
+          while true; do
+            echo "Checking dependencies..."
+            sleep 10
+          done
+        resources:
+          limits:
+            memory: 128Mi  # Significantly increased to prevent OOMKills
+            cpu: 100m
+          requests:
+            cpu: 50m
+            memory: 64Mi
