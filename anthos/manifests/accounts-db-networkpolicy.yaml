@@ -1,0 +1,28 @@
+# NetworkPolicy for accounts-db access control
+# This policy allows ingress to accounts-db pods from both contacts and userservice
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: accountdb-acl
+  labels:
+    application: bank-of-anthos
+    environment: development
+    team: accounts
+    tier: db
+spec:
+  podSelector:
+    matchLabels:
+      app: accounts-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: contacts
+        - podSelector:
+            matchLabels:
+              app: userservice
+      ports:
+        - protocol: TCP
+          port: 5432
