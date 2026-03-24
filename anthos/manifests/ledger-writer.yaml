@@ -44,6 +44,7 @@ metadata:
     tier: backend
   name: ledgerwriter
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: ledgerwriter
