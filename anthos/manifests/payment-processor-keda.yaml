@@ -1,0 +1,31 @@
+# KEDA ScaledObject for payment-processor Kafka consumer auto-scaling
+# This enables automatic scaling based on Kafka consumer lag
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: payment-processor-scaler
+  namespace: bank-of-singapore-demo25-1774433043
+  labels:
+    app: payment-processor
+    component: settlement
+spec:
+  scaleTargetRef:
+    name: payment-processor
+  pollingInterval: 30
+  cooldownPeriod: 300
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  triggers:
+    - type: kafka
+      metadata:
+        # Kafka broker addresses
+        bootstrapServers: my-cluster-kafka-bootstrap.bank-of-singapore-demo25-1774433043.svc.cluster.local:9092
+        # Consumer group ID from deployment
+        consumerGroup: payment-processor-group
+        # Topic to monitor
+        topic: payment-events
+        # Lag threshold - scale when lag exceeds this per replica
+        # With max 3 replicas, this allows ~3000 total lag before hitting ceiling
+        lagThreshold: '1000'
+        # Offset reset policy
+        offsetResetPolicy: latest
