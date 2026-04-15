@@ -1,0 +1,59 @@
+name: Cleanup Old Komodor Bot PRs
+
+on:
+	schedule:
+		- cron: '17 3 * * *'
+	workflow_dispatch:
+
+permissions:
+	contents: read
+	pull-requests: write
+
+jobs:
+	cleanup-komodor-bot-prs:
+		runs-on: ubuntu-latest
+		env:
+			CLOSE_AFTER_DAYS: '4'
+			TARGET_AUTHOR: komodor-bot
+		steps:
+			- name: Close stale PRs opened by komodor-bot
+				uses: actions/github-script@v7
+				with:
+					script: |
+						const closeAfterDays = Number(process.env.CLOSE_AFTER_DAYS || '4');
+						const targetAuthor = (process.env.TARGET_AUTHOR || 'komodor-bot').toLowerCase();
+						const cutoff = Date.now() - closeAfterDays * 24 * 60 * 60 * 1000;
+
+						const openPulls = await github.paginate(github.rest.pulls.list, {
+							owner: context.repo.owner,
+							repo: context.repo.repo,
+							state: 'open',
+							per_page: 100,
+						});
+
+						const staleBotPulls = openPulls.filter((pull) => {
+							const author = (pull.user?.login || '').toLowerCase();
+							const createdAt = new Date(pull.created_at).getTime();
+
+							return (
+								(author === targetAuthor || author === `${targetAuthor}[bot]`) &&
+								createdAt <= cutoff
+							);
+						});
+
+						if (staleBotPulls.length === 0) {
+							core.info(`No open PRs from ${targetAuthor} older than ${closeAfterDays} days.`);
+							return;
+						}
+
+						for (const pull of staleBotPulls) {
+							core.info(`Closing PR #${pull.number} (${pull.title}) opened by ${pull.user.login}.`);
+							await github.rest.pulls.update({
+								owner: context.repo.owner,
+								repo: context.repo.repo,
+								pull_number: pull.number,
+								state: 'closed',
+							});
+						}
+
+						core.info(`Closed ${staleBotPulls.length} stale PR(s).`);
