@@ -28,6 +28,8 @@ metadata:
     environment: development
     team: ledger
     tier: db
+  annotations:
+    app.kubernetes.io/source-repo: github.com/komodorio-demo/demo2026
   name: ledger-db-config
 ---
 apiVersion: v1
@@ -38,6 +40,8 @@ metadata:
     environment: development
     team: ledger
     tier: db
+  annotations:
+    app.kubernetes.io/source-repo: github.com/komodorio-demo/demo2026
   name: ledger-db
 spec:
   ports:
@@ -60,6 +64,8 @@ metadata:
     environment: development
     team: ledger
     tier: db
+  annotations:
+    app.kubernetes.io/source-repo: github.com/komodorio-demo/demo2026
   name: ledger-db
 spec:
   replicas: 1
