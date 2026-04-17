@@ -1,0 +1,26 @@
+# KEDA ScaledObject for payment-processor
+# Automatically scales based on Kafka consumer lag
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: payment-processor-scaler
+  labels:
+    application: bank-of-anthos
+    environment: development
+    team: payments
+    tier: backend
+spec:
+  scaleTargetRef:
+    name: payment-processor
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 60
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: my-cluster-kafka-bootstrap:9092
+        consumerGroup: payment-processor-group
+        topic: payment-events
+        lagThreshold: "1000"
+        offsetResetPolicy: latest
