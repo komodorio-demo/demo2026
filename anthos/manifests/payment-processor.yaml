@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: processor-scripts
+  labels:
+    app: payment-processor
+    component: settlement
+type: Opaque
+stringData:
+  entrypoint.sh: |
+    #!/bin/sh
+    # Payment processor - consumes from Kafka and settles transactions
+
+    echo "Starting payment processor..."
+    echo "Kafka bootstrap: ${KAFKA_BOOTSTRAP_SERVERS}"
+    echo "Consumer group: ${CONSUMER_GROUP_ID}"
+    echo "Topic: ${KAFKA_TOPIC}"
+
+    # Mark healthy for probes
+    touch /tmp/healthy
+
+    # Background health marker
+    (
+        while true; do
+            touch /tmp/healthy
+            sleep 15
+        done
+    ) &
+
+    # Continuous consumer - streams messages without artificial delays
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] Starting continuous Kafka consumer..."
+    while true; do
+        /opt/kafka/bin/kafka-console-consumer.sh \
+            --bootstrap-server "${KAFKA_BOOTSTRAP_SERVERS}" \
+            --topic "${KAFKA_TOPIC}" \
+            --group "${CONSUMER_GROUP_ID}" \
+            --consumer-property session.timeout.ms=30000 \
+            --consumer-property max.poll.interval.ms=300000 | \
+        while read -r msg; do
+            echo "[$(date +'%Y-%m-%d %H:%M:%S')] Processing payment: ${msg}"
+            echo "[$(date +'%Y-%m-%d %H:%M:%S')] Payment settled successfully"
+        done
+        echo "[$(date +'%Y-%m-%d %H:%M:%S')] Consumer disconnected, reconnecting in 2s..."
+        sleep 2
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-processor
+  labels:
+    app: payment-processor
+    component: settlement
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-processor
+  template:
+    metadata:
+      labels:
+        app: payment-processor
+        component: settlement
+    spec:
+      containers:
+      - name: processor
+        image: quay.io/strimzi/kafka:0.51.0-kafka-4.1.1
+        command: ["/bin/sh", "/scripts/entrypoint.sh"]
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "my-cluster-kafka-bootstrap:9092"
+        - name: CONSUMER_GROUP_ID
+          value: "payment-processor-group"
+        - name: KAFKA_TOPIC
+          value: "payment-events"
+        - name: KAFKA_HEAP_OPTS
+          value: "-Xmx256m -Xms128m"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 384Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command: ["/bin/sh", "-c", "test -f /tmp/healthy"]
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command: ["/bin/sh", "-c", "test -f /tmp/healthy"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: scripts
+        secret:
+          secretName: processor-scripts
+          defaultMode: 0755
