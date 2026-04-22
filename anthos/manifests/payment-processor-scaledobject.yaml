@@ -1,0 +1,24 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: payment-processor-scaler
+  namespace: bank-of-singapore-demo5-1776864222
+  labels:
+    app: payment-processor
+    component: settlement
+spec:
+  scaleTargetRef:
+    name: payment-processor
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 60
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: my-cluster-kafka-bootstrap.bank-of-singapore-demo5-1776864222.svc.cluster.local:9092
+        consumerGroup: payment-processor-group
+        topic: payment-events
+        lagThreshold: "100"
+        offsetResetPolicy: latest
+        allowIdleConsumers: "false"
