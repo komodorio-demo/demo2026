@@ -1,0 +1,18 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: strimzi-operator-scaler
+  namespace: bank-of-singapore-demo23-1778572633
+spec:
+  scaleTargetRef:
+    name: strimzi-cluster-operator
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  triggers:
+  - type: kafka
+    metadata:
+      bootstrapServers: my-cluster-kafka-bootstrap.bank-of-singapore-demo23-1778572633.svc:9092
+      consumerGroup: strimzi-cluster-operator-group
+      topic: payment-events
+      lagThreshold: "100"
+      activationLagThreshold: "50"
