@@ -1,0 +1,159 @@
+# Copyright 2024 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-processor
+  namespace: bank-of-singapore-demo5-1780306077
+  labels:
+    application: bank-of-anthos
+    tier: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: payment-processor
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-processor
+  namespace: bank-of-singapore-demo5-1780306077
+  labels:
+    application: bank-of-anthos
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-processor
+  template:
+    metadata:
+      labels:
+        app: payment-processor
+        application: bank-of-anthos
+        tier: backend
+    spec:
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 5
+      containers:
+      - name: payment-processor
+        image: gcr.io/bank-of-anthos-ci/payment-processor:v0.6.5
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: keys
+          mountPath: "/root/.ssh"
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /app/processor-scripts
+          name: processor-scripts
+        env:
+        - name: VERSION
+          value: "v0.6.5"
+        - name: PORT
+          value: "8080"
+        - name: ENABLE_TRACING
+          value: "true"
+        - name: ENABLE_METRICS
+          value: "true"
+        - name: POLL_MS
+          value: "100"
+        - name: CACHE_SIZE
+          value: "1000000"
+        - name: CACHE_MINUTES
+          value: "60"
+        - name: JVM_OPTS
+          value: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -Xms256m -Xmx512m"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "my-cluster-kafka-bootstrap.bank-of-singapore-demo5-1780306077.svc.cluster.local:9092"
+        - name: KAFKA_CONSUMER_GROUP
+          value: "payment-processor-group"
+        - name: KAFKA_TOPIC
+          value: "payment-events"
+        envFrom:
+        - configMapRef:
+            name: environment-config
+        - configMapRef:
+            name: service-api-config
+        - configMapRef:
+            name: demo-data-config
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - /app/processor-scripts/check-lag.sh
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /healthy
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: keys
+        secret:
+          secretName: jwt-key
+          items:
+          - key: jwtRS256.key.pub
+            path: publickey
+      - emptyDir: {}
+        name: tmp
+      - name: processor-scripts
+        secret:
+          secretName: processor-scripts
+          defaultMode: 0755
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: payment-processor-scaler
+  namespace: bank-of-singapore-demo5-1780306077
+  labels:
+    application: bank-of-anthos
+    tier: backend
+spec:
+  scaleTargetRef:
+    name: payment-processor
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  pollingInterval: 30
+  cooldownPeriod: 120
+  triggers:
+  - type: kafka
+    metadata:
+      bootstrapServers: my-cluster-kafka-bootstrap.bank-of-singapore-demo5-1780306077.svc.cluster.local:9092
+      consumerGroup: payment-processor-group
+      topic: payment-events
+      lagThreshold: "1000"
+      offsetResetPolicy: earliest
