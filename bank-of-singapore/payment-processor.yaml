@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-processor
+  namespace: bank-of-singapore-demo19-1773324355
+  labels:
+    app: payment-processor
+    component: settlement
+spec:
+  # Multi-replica deployment for parallel Kafka partition consumption
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-processor
+  template:
+    metadata:
+      labels:
+        app: payment-processor
+        component: settlement
+    spec:
+      containers:
+      - name: processor
+        image: quay.io/strimzi/kafka:0.51.0-kafka-4.1.1
+        command:
+        - /bin/sh
+        - /scripts/entrypoint.sh
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: my-cluster-kafka-bootstrap:9092
+        - name: CONSUMER_GROUP_ID
+          value: payment-processor-group
+        - name: KAFKA_TOPIC
+          value: payment-events
+        - name: KAFKA_HEAP_OPTS
+          value: -Xmx256m -Xms128m
+        resources:
+          requests:
+            cpu: 100m
+            memory: 384Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - test -f /tmp/healthy
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - test -f /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: scripts
+        secret:
+          secretName: processor-scripts
+          defaultMode: 0755
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-processor-hpa
+  namespace: bank-of-singapore-demo19-1773324355
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-processor
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-processor-pdb
+  namespace: bank-of-singapore-demo19-1773324355
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: payment-processor
