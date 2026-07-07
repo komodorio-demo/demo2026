@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: report-service-code
+  namespace: report-monaco-demo10-1783437948
+data:
+  app.py: |
+    import os
+    import logging
+    from flask import Flask, jsonify
+    import psycopg2
+    import psycopg2.extras
+    from ddtrace import tracer
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    log = logging.getLogger("report-service")
+
+    DB_HOST = os.environ.get("REPORT_DB_HOST", "report-db")
+    DB_PORT = int(os.environ.get("REPORT_DB_PORT", "5432"))
+    DB_USER = os.environ.get("REPORT_DB_USER", "reports")
+    DB_PASSWORD = os.environ.get("REPORT_DB_PASSWORD", "reports")
+    DB_NAME = os.environ.get("REPORT_DB_NAME", "reports")
+
+    app = Flask(__name__)
+
+
+    def get_connection():
+        return psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dbname=DB_NAME,
+            connect_timeout=5,
+        )
+
+
+    @app.route("/health")
+    def health():
+        return jsonify(status="ok"), 200
+
+
+    @app.route("/reports/<customer_id>/events")
+    def get_events(customer_id):
+        root = tracer.current_root_span()
+        if root is not None:
+            root.set_tag("customer.id", customer_id)
+
+        conn = get_connection()
+        try:
+            with tracer.trace("report.fetch_events") as fetch_span:
+                fetch_span.set_tag("customer.id", customer_id)
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT id, customer_id, event_type, payload, created_at "
+                        "FROM events WHERE customer_id = %s "
+                        "ORDER BY created_at DESC LIMIT 100",
+                        (customer_id,),
+                    )
+                    rows = cur.fetchall()
+                fetch_span.set_tag("row_count", len(rows))
+
+            events = [
+                {
+                    "id": r["id"],
+                    "customer_id": r["customer_id"],
+                    "event_type": r["event_type"],
+                    "payload": r["payload"],
+                    "created_at": r["created_at"].isoformat(),
+                }
+                for r in rows
+            ]
+            return jsonify(events=events, count=len(events)), 200
+        finally:
+            conn.close()
+
+
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=8080)
