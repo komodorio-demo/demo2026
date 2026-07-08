@@ -1,0 +1,26 @@
+# Feature flags ConfigMap for checkout-service
+# This ConfigMap must be created in each namespace that deploys checkout-service
+#
+# IMPORTANT: The checkout-service code expects these exact key names:
+#   - enable_premium_routing (NOT enable_premium_routng)
+#   - enable_express_checkout
+#   - enable_promo_codes
+#
+# Common typo to avoid: enable_premium_routng (missing 'i')
+# This typo causes premium requests to fall back to the slow 220ms path
+# instead of the optimized 30ms path, causing SLO violations.
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feature-flags
+  labels:
+    app: checkout-service
+data:
+  flags.yaml: |
+    # Feature flags consumed by checkout-service.
+    # The flag SDK looks up flags by key and falls back to default=false
+    # (with a WARN log line) when the requested key is missing.
+    enable_premium_routing: true
+    enable_express_checkout: true
+    enable_promo_codes: true
