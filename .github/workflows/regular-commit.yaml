@@ -1,0 +1,33 @@
+name: Regular commiting
+description: |-
+  This Action commits a date/time to a `.metadata` file, this ensures that regular commmits appear on the default branch.
+  By doing this, it keeps github actions running scheduled actions.
+
+on:
+  workflow_dispatch:
+  schedule:
+  - cron:  '0 1 * * */5'
+
+# ONLY EVER RUN ONE AT A TIME
+concurrency: ${{ github.workflow }}
+
+jobs:
+  update-metadata:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        name: Checkout Code
+        with:
+          fetch-depth: 1
+          
+      - run: "date > .metadata"
+
+      - uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "Updating metadata"
+          commit_user_name: David Collom [Auto]
+          commit_user_email: david@collom.co.uk
+          file_pattern: ".metadata"
+          skip_checkout: true
